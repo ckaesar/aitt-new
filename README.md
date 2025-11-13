@@ -18,6 +18,26 @@ AI
   - 后端：`logs/backend_dev.log`
   - 前端：`logs/frontend_dev.log`
 
+### 一键重启与健康验证
+
+- 在项目根目录执行下列命令，可一键停止、启动并进行本机健康验证：
+
+```
+bash ./scripts/stop_all.sh && \
+BACKEND_PORT=8000 FRONTEND_PORT=3000 CONDA_ENV_NAME=py311 bash ./scripts/start_all.sh && \
+sleep 2 && ss -lntp | grep -E ':(8000|3000)' || true && \
+curl -s http://127.0.0.1:8000/api/v1/health && echo && \
+curl -s http://127.0.0.1:3000/ | head -n 3
+```
+
+参数说明：
+- `BACKEND_PORT`：后端服务监听端口，默认 `8000`
+- `FRONTEND_PORT`：前端 Vite 开发端口，默认 `3000`
+- `CONDA_ENV_NAME`：后端使用的 Conda 环境名（如需启用 64 位 Python 与依赖），示例 `py311` 或 `aitt-py311`
+- `ss -lntp`：查看端口监听状态；`grep -E ':(8000|3000)'` 过滤出关键端口；`|| true` 保证命令不会因无匹配而中断
+- `curl http://127.0.0.1:8000/api/v1/health`：后端健康检查（返回 `healthy` 表示后端正常）
+- `curl http://127.0.0.1:3000/ | head -n 3`：前端首页返回，取前 3 行快速确认页面正常
+
 ### 64 位 Python（强烈建议）
 - 为确保 `chromadb`、`greenlet` 等依赖正常工作，推荐使用 64 位 Python（Conda 环境）。
 - 两种指定方式（二选一）：
