@@ -44,13 +44,37 @@ async def list_templates(
     service = QueryService(db)
     try:
         items = await service.list_templates(limit=limit, offset=offset)
+        data: list[QueryTemplateResponse] = []
+        for i in items:
+            params_val = getattr(i, "parameters", None)
+            if isinstance(params_val, str):
+                try:
+                    import json
+                    params_val = json.loads(params_val)
+                except Exception:
+                    params_val = None
+            data.append(
+                QueryTemplateResponse(
+                    id=int(getattr(i, "id")),
+                    name=str(getattr(i, "name")),
+                    description=getattr(i, "description", None),
+                    category=getattr(i, "category", None),
+                    natural_language_template=str(getattr(i, "natural_language_template")),
+                    sql_template=str(getattr(i, "sql_template")),
+                    parameters=params_val,
+                    is_public=bool(getattr(i, "is_public", False)),
+                    usage_count=int(getattr(i, "usage_count", 0) or 0),
+                    created_by=int(getattr(i, "created_by", 0)),
+                    created_at=getattr(i, "created_at"),
+                    updated_at=getattr(i, "updated_at"),
+                )
+            )
         return PaginatedResponse(
-            data=[QueryTemplateResponse.from_orm(i) for i in items],
-            pagination=PaginationInfo(limit=limit, offset=offset, total=len(items)),
+            data=data,
+            pagination=PaginationInfo(limit=limit, offset=offset, total=len(data)),
             message="获取模板列表成功",
         )
     except Exception as e:
-        # 开发环境降级：数据库或依赖不可用时返回空列表，避免前端崩溃
         return PaginatedResponse(
             data=[],
             pagination=PaginationInfo(limit=limit, offset=offset, total=0),

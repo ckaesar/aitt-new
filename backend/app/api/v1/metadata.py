@@ -106,3 +106,27 @@ def get_chroma_counts():
     except Exception as e:
         logger.warning("获取 Chroma 计数失败: {}", e)
         return {"status": "error", "message": str(e)}
+
+
+@router.get("/search")
+def search_metadata(q: str, top_k: int = 10):
+    """
+    基于 Chroma 元数据集合的语义检索：返回匹配项与结构化上下文。
+    - items: 来自集合的检索条目（包含 type/table/column 等元信息）
+    - context: 将匹配条目组织为“表 -> 列”的结构化上下文，便于人读与提示词注入
+    """
+    try:
+        ms = MetadataSearch()
+        items = ms.query(q, top_k=top_k)
+        grouped_ctx = ms.get_grouped_context_for_query(q, top_k=min(12, max(1, top_k)))
+        return {
+            "status": "ok",
+            "available": bool(getattr(ms, "collection", None)),
+            "items": items,
+            "context": grouped_ctx,
+            "collection": settings.CHROMA_METADATA_COLLECTION_NAME,
+            "persist_dir": getattr(settings, "CHROMA_PERSIST_DIRECTORY", "./chroma_db"),
+        }
+    except Exception as e:
+        logger.warning("元数据检索失败: {}", e)
+        return {"status": "error", "message": str(e)}

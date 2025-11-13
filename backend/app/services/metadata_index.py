@@ -91,18 +91,34 @@ class MetadataIndexer:
                 path=settings.CHROMA_PERSIST_DIRECTORY,
                 settings=ChromaSettings(anonymized_telemetry=False),
             )
-            self._collection = self._client.get_or_create_collection(
-                name=settings.CHROMA_METADATA_COLLECTION_NAME,
-                metadata={"hnsw:space": "cosine"},
-            )
             # 尝试加载嵌入函数；失败则置空
             try:
                 if embedding_functions is not None:
-                    self._ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-                        model_name="paraphrase-multilingual-MiniLM-L12-v2"
-                    )
+                    try:
+                        self._ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                            model_name="paraphrase-multilingual-MiniLM-L12-v2"
+                        )
+                    except Exception:
+                        self._ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+                            model_name="all-MiniLM-L6-v2"
+                        )
+                else:
+                    self._ef = None
             except Exception:
                 self._ef = None
+
+            # 创建集合时若可用则绑定嵌入函数，保证后续 query_texts 可用
+            if self._ef is not None:
+                self._collection = self._client.get_or_create_collection(
+                    name=settings.CHROMA_METADATA_COLLECTION_NAME,
+                    metadata={"hnsw:space": "cosine"},
+                    embedding_function=self._ef,
+                )
+            else:
+                self._collection = self._client.get_or_create_collection(
+                    name=settings.CHROMA_METADATA_COLLECTION_NAME,
+                    metadata={"hnsw:space": "cosine"},
+                )
             self._available = True
             logger.info(
                 "MetadataIndexer 初始化: dir='{}', collection='{}'",
@@ -154,8 +170,13 @@ class MetadataIndexer:
         try:
             # 若提供 embedding function，可在客户端侧生成向量（Chromadb也支持服务端嵌入）
             if self._ef is not None:
-                embs = [self._ef(x) for x in docs]
-                self._collection.upsert(ids=ids, metadatas=metas, documents=docs, embeddings=embs)
+                # 统一批量生成嵌入以提高性能
+                try:
+                    embs = self._ef(docs)
+                    self._collection.upsert(ids=ids, metadatas=metas, documents=docs, embeddings=embs)
+                except Exception:
+                    # 若嵌入生成失败，退化为不显式提供嵌入，由集合绑定的函数处理
+                    self._collection.upsert(ids=ids, metadatas=metas, documents=docs)
             else:
                 self._collection.upsert(ids=ids, metadatas=metas, documents=docs)
         except Exception as e:

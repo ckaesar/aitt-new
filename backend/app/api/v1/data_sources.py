@@ -16,6 +16,7 @@ from app.schemas.data_source import (
     TableColumnResponse,
 )
 from app.services.data_source import DataSourceService
+from app.models.data_source import DataSourceType
 # 暂时不做鉴权，移除 require_admin 与 require_analyst 依赖
 
 router = APIRouter()
@@ -37,11 +38,45 @@ async def list_data_sources(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    列出数据源，兼容底层返回的 ORM 模型或字典对象，并强制布尔字段为有效值。
+    """
     service = DataSourceService(db)
     items = await service.list(limit=limit, offset=offset)
+    data: list[DataSourceResponse] = []
+    for i in items:
+        # 兼容枚举字段类型
+        try:
+            ds_type = i.type if hasattr(i, "type") else None
+            if ds_type is None:
+                ds_type = None
+            elif isinstance(ds_type, DataSourceType):
+                pass
+            else:
+                ds_type = DataSourceType(str(ds_type))
+        except Exception:
+            ds_type = DataSourceType.MYSQL
+
+        data.append(
+            DataSourceResponse(
+                id=int(getattr(i, "id")),
+                name=str(getattr(i, "name")),
+                type=ds_type,
+                host=str(getattr(i, "host")),
+                port=int(getattr(i, "port")),
+                database_name=str(getattr(i, "database_name")),
+                username=getattr(i, "username", None),
+                description=getattr(i, "description", None),
+                is_active=bool(getattr(i, "is_active", True)),
+                created_by=int(getattr(i, "created_by", 0)),
+                created_at=getattr(i, "created_at"),
+                updated_at=getattr(i, "updated_at"),
+            )
+        )
+
     return PaginatedResponse(
-        data=[DataSourceResponse.from_orm(i) for i in items],
-        pagination=PaginationInfo(limit=limit, offset=offset, total=len(items)),
+        data=data,
+        pagination=PaginationInfo(limit=limit, offset=offset, total=len(data)),
         message="获取数据源列表成功",
     )
 
@@ -60,20 +95,40 @@ async def list_tables_by_data_source(
     data: list[DataTableResponse] = []
     for t in tables:
         cols = await service.list_columns(table_id=t.id)
-        data.append(DataTableResponse(
-            id=t.id,
-            data_source_id=t.data_source_id,
-            table_name=t.table_name,
-            display_name=t.display_name,
-            description=t.description,
-            category=t.category,
-            tags=t.tags,
-            row_count=t.row_count or 0,
-            size_mb=t.size_mb,
-            last_updated=t.last_updated,
-            is_active=t.is_active,
-            columns=[TableColumnResponse.from_orm(c) for c in cols]
-        ))
+        safe_cols: list[TableColumnResponse] = []
+        for c in cols:
+            safe_cols.append(
+                TableColumnResponse(
+                    id=int(getattr(c, "id")),
+                    column_name=str(getattr(c, "column_name")),
+                    display_name=getattr(c, "display_name", None),
+                    data_type=str(getattr(c, "data_type")),
+                    is_nullable=bool(getattr(c, "is_nullable", True)),
+                    default_value=getattr(c, "default_value", None),
+                    description=getattr(c, "description", None),
+                    is_dimension=bool(getattr(c, "is_dimension", False)),
+                    is_metric=bool(getattr(c, "is_metric", False)),
+                    is_primary_key=bool(getattr(c, "is_primary_key", False)),
+                    is_foreign_key=bool(getattr(c, "is_foreign_key", False)),
+                    column_order=int(getattr(c, "column_order", 0)),
+                )
+            )
+        data.append(
+            DataTableResponse(
+                id=int(getattr(t, "id")),
+                data_source_id=int(getattr(t, "data_source_id")),
+                table_name=str(getattr(t, "table_name")),
+                display_name=getattr(t, "display_name", None),
+                description=getattr(t, "description", None),
+                category=getattr(t, "category", None),
+                tags=getattr(t, "tags", None),
+                row_count=int(getattr(t, "row_count", 0) or 0),
+                size_mb=getattr(t, "size_mb", None),
+                last_updated=getattr(t, "last_updated", None),
+                is_active=bool(getattr(t, "is_active", True)),
+                columns=safe_cols,
+            )
+        )
     return PaginatedResponse(
         data=data,
         pagination=PaginationInfo(limit=limit, offset=offset, total=len(data)),
@@ -89,7 +144,25 @@ async def list_columns_by_table(
     """列出指定数据表的字段。"""
     service = DataSourceService(db)
     cols = await service.list_columns(table_id=table_id)
-    return DataResponse(data=[TableColumnResponse.from_orm(c) for c in cols], message="获取字段列表成功")
+    safe_cols: list[TableColumnResponse] = []
+    for c in cols:
+        safe_cols.append(
+            TableColumnResponse(
+                id=int(getattr(c, "id")),
+                column_name=str(getattr(c, "column_name")),
+                display_name=getattr(c, "display_name", None),
+                data_type=str(getattr(c, "data_type")),
+                is_nullable=bool(getattr(c, "is_nullable", True)),
+                default_value=getattr(c, "default_value", None),
+                description=getattr(c, "description", None),
+                is_dimension=bool(getattr(c, "is_dimension", False)),
+                is_metric=bool(getattr(c, "is_metric", False)),
+                is_primary_key=bool(getattr(c, "is_primary_key", False)),
+                is_foreign_key=bool(getattr(c, "is_foreign_key", False)),
+                column_order=int(getattr(c, "column_order", 0)),
+            )
+        )
+    return DataResponse(data=safe_cols, message="获取字段列表成功")
 
 
 @router.get("/{ds_id}", response_model=DataResponse[DataSourceResponse])
@@ -97,11 +170,34 @@ async def get_data_source(
     ds_id: int,
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    获取单个数据源，确保布尔字段有效，兼容 ORM 或字典对象。
+    """
     service = DataSourceService(db)
     ds = await service.get(ds_id)
     if not ds:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="数据源不存在")
-    return DataResponse(data=DataSourceResponse.from_orm(ds), message="获取数据源成功")
+
+    try:
+        ds_type = ds.type if isinstance(getattr(ds, "type", None), DataSourceType) else DataSourceType(str(getattr(ds, "type")))
+    except Exception:
+        ds_type = DataSourceType.MYSQL
+
+    resp = DataSourceResponse(
+        id=int(getattr(ds, "id")),
+        name=str(getattr(ds, "name")),
+        type=ds_type,
+        host=str(getattr(ds, "host")),
+        port=int(getattr(ds, "port")),
+        database_name=str(getattr(ds, "database_name")),
+        username=getattr(ds, "username", None),
+        description=getattr(ds, "description", None),
+        is_active=bool(getattr(ds, "is_active", True)),
+        created_by=int(getattr(ds, "created_by", 0)),
+        created_at=getattr(ds, "created_at"),
+        updated_at=getattr(ds, "updated_at"),
+    )
+    return DataResponse(data=resp, message="获取数据源成功")
 
 
 @router.patch("/{ds_id}", response_model=DataResponse[DataSourceResponse])

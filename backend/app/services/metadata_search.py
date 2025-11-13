@@ -35,10 +35,32 @@ class MetadataSearch:
                 path=settings.CHROMA_PERSIST_DIRECTORY,
                 settings=ChromaSettings(anonymized_telemetry=False),
             )
-            self.collection = self.client.get_or_create_collection(
-                name=settings.CHROMA_METADATA_COLLECTION_NAME,
-                metadata={"hnsw:space": "cosine"},
-            )
+            # 绑定嵌入函数以支持 query_texts
+            ef = None
+            try:
+                from chromadb.utils import embedding_functions as _ef
+                try:
+                    ef = _ef.SentenceTransformerEmbeddingFunction(
+                        model_name="paraphrase-multilingual-MiniLM-L12-v2"
+                    )
+                except Exception:
+                    ef = _ef.SentenceTransformerEmbeddingFunction(
+                        model_name="all-MiniLM-L6-v2"
+                    )
+            except Exception:
+                ef = None
+
+            if ef is not None:
+                self.collection = self.client.get_or_create_collection(
+                    name=settings.CHROMA_METADATA_COLLECTION_NAME,
+                    metadata={"hnsw:space": "cosine"},
+                    embedding_function=ef,
+                )
+            else:
+                self.collection = self.client.get_or_create_collection(
+                    name=settings.CHROMA_METADATA_COLLECTION_NAME,
+                    metadata={"hnsw:space": "cosine"},
+                )
             self.available = True
             logger.info(
                 "MetadataSearch 初始化: dir='{}', collection='{}'",

@@ -1,7 +1,7 @@
 -- AI智能自助取数平台数据库初始化脚本
 -- 创建数据库
-CREATE DATABASE IF NOT EXISTS ai_data_platform DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE ai_data_platform;
+CREATE DATABASE IF NOT EXISTS smart_finance_area DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE smart_finance_area;
 
 -- 用户表
 CREATE TABLE aitt_users (

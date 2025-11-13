@@ -1,5 +1,5 @@
 -- 示例数据插入脚本
-USE ai_data_platform;
+USE smart_finance_area;
 
 -- 插入示例用户
 INSERT INTO aitt_users (username, email, password_hash, full_name, department, role) VALUES

@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(
         # 切换为MySQL异步驱动（aiomysql），默认指向提供的服务器
         # 如需修改库名或账号密码，建议通过 .env 覆盖
-        default="mysql+aiomysql://mathapp:MathApp2024@localhost:3306/ai_data_platform?charset=utf8mb4",
+        default="mysql+aiomysql://mathapp:MathApp2024@localhost:3306/smart_finance_area?charset=utf8mb4",
         description="数据库连接URL"
     )
     

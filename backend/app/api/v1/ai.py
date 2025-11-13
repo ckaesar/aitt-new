@@ -12,6 +12,7 @@ from app.services.ai import AIService
 from app.services.query import QueryService
 from app.models.query import QueryStatus
 from app.services.rag import RAGService
+from app.services.metadata_search import MetadataSearch
 
 router = APIRouter()
 
@@ -21,6 +22,11 @@ async def ai_query(
     payload: AIQueryRequest,
     db: AsyncSession = Depends(get_db),
 ):
+    """AI 查询：生成 SQL 并返回结构化解析与上下文
+    - 若启用 RAG：先检索文档片段并拼接为 `rag_context`
+    - 同步构建元数据结构化上下文（表 -> 列），并在响应的 `rag_context` 中合并展示
+    - 传入模型的上下文保持文档RAG片段；元数据上下文在服务层注入，避免重复向量查询
+    """
     # 入参日志（避免记录过长文本，做长度与关键标记）
     try:
         logger.info(
@@ -35,9 +41,10 @@ async def ai_query(
         pass
     ai = AIService(db)
     qs = QueryService(db)
-    # 若启用RAG，先检索片段与拼接上下文，供SQL生成与响应展示
+    # 若启用RAG，先检索片段与拼接上下文，供SQL生成
     rag_chunks = []
     rag_context = None
+    metadata_ctx = None
     if payload.use_rag:
         try:
             rag = RAGService()
@@ -47,8 +54,23 @@ async def ai_query(
         except Exception:
             rag_chunks = []
             rag_context = None
-    # 生成SQL（支持RAG上下文）
-    generated_sql = await ai.generate_sql(payload.query, context=payload.context, use_rag=payload.use_rag or False, rag_context=rag_context)
+        # 同步构建元数据结构化上下文（表 -> 列），用于响应展示与调试
+        try:
+            ms = MetadataSearch()
+            metadata_ctx = ms.get_grouped_context_for_query(payload.query, top_k=12)
+            try:
+                logger.info("AI接口: 元数据上下文就绪 len(meta_ctx)={}", len(metadata_ctx or ""))
+            except Exception:
+                pass
+        except Exception:
+            metadata_ctx = None
+    # 生成SQL（支持RAG文档上下文）
+    generated_sql = await ai.generate_sql(
+        payload.query,
+        context=payload.context,
+        use_rag=payload.use_rag or False,
+        rag_context=rag_context,
+    )
     # 记录历史（开发模式：若数据库不可用则忽略错误）
     try:
         history = await qs.create_history(
@@ -147,6 +169,12 @@ async def ai_query(
         }
 
     analysis = _analyze_sql(generated_sql or "")
+    # 响应中的 rag_context 合并元数据结构化上下文 + 文档RAG片段，便于前端引用与诊断
+    combined_ctx_for_response = None
+    if metadata_ctx and rag_context:
+        combined_ctx_for_response = metadata_ctx + "\n" + rag_context
+    else:
+        combined_ctx_for_response = metadata_ctx or rag_context
     resp = AIQueryResponse(
         conversation_id=None,
         message_id=None,
@@ -156,7 +184,7 @@ async def ai_query(
         suggestions=["已为您解析出表、维度、指标、筛选与排序，可调整后执行"],
         confidence=0.5,
         processing_time_ms=0,
-        rag_context=rag_context,
+        rag_context=combined_ctx_for_response,
         rag_chunks=rag_chunks,
         tables=analysis["tables"],
         selected_table=analysis["selected_table"],
