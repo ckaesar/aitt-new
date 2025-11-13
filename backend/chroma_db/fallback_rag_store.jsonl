@@ -1,0 +1,6 @@
+{"id": "sql-guide-1", "text": "SQL 基础：使用 SELECT 列名 FROM 表名；过滤用 WHERE；可组合 AND/OR；数值比较用 >、<、=，模糊匹配用 LIKE '%关键词%'。", "source": "SQL手册"}
+{"id": "sql-guide-2", "text": "JOIN 用法：内连接 INNER JOIN，左连接 LEFT JOIN；连接条件使用 ON t1.col = t2.col；多表连接时按业务主键/外键进行关联。", "source": "SQL手册"}
+{"id": "sql-guide-3", "text": "聚合统计：使用 GROUP BY 维度，聚合函数 COUNT/SUM/AVG/MIN/MAX；聚合后筛选用 HAVING（如 HAVING SUM(amount) > 1000）。", "source": "SQL手册"}
+{"id": "sql-guide-4", "text": "排序与分页：ORDER BY 列名 ASC/DESC；LIMIT n 控制返回条数；OFFSET m 指定起始位置（或使用 LIMIT m, n）。", "source": "SQL手册"}
+{"id": "sql-guide-5", "text": "典型电商表：用户(user)、商品(product)、订单(order)、订单明细(order_item)。主外键：order.id 与 order_item.order_id；商品与明细通过 product.id 与 order_item.product_id 关联。", "source": "知识库"}
+{"id": "sql-guide-6", "text": "示例：统计最近30天各商品销量 Top10：\nSELECT p.name, SUM(oi.quantity) AS qty\nFROM order_item oi\nJOIN product p ON oi.product_id = p.id\nJOIN `order` o ON oi.order_id = o.id\nWHERE o.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\nGROUP BY p.name\nORDER BY qty DESC\nLIMIT 10;", "source": "示例SQL"}

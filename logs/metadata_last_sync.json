@@ -1,0 +1,12 @@
+{
+  "sources_total": 2,
+  "tables_total": 6,
+  "columns_total": 34,
+  "deleted_sources": 0,
+  "deleted_tables": 0,
+  "deleted_columns": 0,
+  "upserted_sources": 2,
+  "upserted_tables": 6,
+  "upserted_columns": 34,
+  "last_sync_time": "2025-11-08T17:01:42"
+}

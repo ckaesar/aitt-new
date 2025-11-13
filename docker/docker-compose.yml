@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    env_file:
+      - ../backend/.env.example
+    environment:
+      DATABASE_URL: mysql+pymysql://mathapp:MathApp2024@localhost:3306/ai_data_platform
+      CHROMA_PERSIST_DIRECTORY: /app/chroma_data
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+      - chroma_data:/app/chroma_data
+    depends_on:
+      - chroma
+      - mysql
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: ai_data_platform
+    ports:
+      - "3306:3306"
+    volumes:
+      - ../database:/docker-entrypoint-initdb.d
+
+volumes:
+  chroma_data:
