@@ -1,0 +1,1022 @@
+{
+  "rounds": {
+    "r1_no_rag": {
+      "accuracy": 0.5333,
+      "avg_latency_ms": 1174.46,
+      "avg_tokens": 12.77,
+      "citation_accuracy": 0.0,
+      "details": [
+        {
+          "query": "统计 sales_orders 表，按 order_date 分组，返回订单数",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "order_date",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 2217.5396220009134,
+          "token_count": 13,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计销售订单金额按天",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "order_date"
+          ],
+          "metrics": [
+            {
+              "column": "avg_order_value",
+              "aggregation": "sum",
+              "alias": "total_sales_amount"
+            }
+          ],
+          "latency_ms": 1194.3568080005207,
+          "token_count": 13,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按客户统计订单数 Top10",
+          "expected_table": "sales_orders",
+          "selected_table": "customers",
+          "dimensions": [
+            "customer_name"
+          ],
+          "metrics": [
+            {
+              "column": "so.customer_id",
+              "aggregation": "count",
+              "alias": "order_count"
+            }
+          ],
+          "latency_ms": 1237.955768001484,
+          "token_count": 25,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "最近30天每天订单金额",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "order_date"
+          ],
+          "metrics": [
+            {
+              "column": "total_amount",
+              "aggregation": "sum",
+              "alias": "daily_order_value"
+            }
+          ],
+          "latency_ms": 1280.0099440009944,
+          "token_count": 21,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按订单状态统计数量",
+          "expected_table": "sales_orders",
+          "selected_table": "",
+          "dimensions": [],
+          "metrics": [],
+          "latency_ms": 621.9606520007801,
+          "token_count": 4,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计2024年订单数",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_summary",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "total_orders",
+              "aggregation": "sum",
+              "alias": "total_orders_count"
+            }
+          ],
+          "latency_ms": 1732.462187001147,
+          "token_count": 14,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计订单平均金额",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "total_amount",
+              "aggregation": "avg",
+              "alias": "avg_order_value"
+            }
+          ],
+          "latency_ms": 852.5658100006694,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计每周订单数",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "DATE_TRUNC('week'",
+            "order_date)"
+          ],
+          "metrics": [
+            {
+              "column": "order_id",
+              "aggregation": "count",
+              "alias": "total_orders"
+            }
+          ],
+          "latency_ms": 1346.8710180004564,
+          "token_count": 17,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计不同客户的订单金额总计",
+          "expected_table": "sales_orders",
+          "selected_table": "",
+          "dimensions": [],
+          "metrics": [],
+          "latency_ms": 480.79377099929843,
+          "token_count": 4,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计订单金额最高的前10个客户",
+          "expected_table": "sales_orders",
+          "selected_table": "",
+          "dimensions": [],
+          "metrics": [],
+          "latency_ms": 545.6021409991081,
+          "token_count": 4,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计 order_items 表中每个 product_id 的销售数量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "product_id",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 1119.203665999521,
+          "token_count": 14,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按 product_id 汇总销量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "product_id",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 748.3277619994624,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计每个订单的商品数量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "order_id"
+          ],
+          "metrics": [
+            {
+              "column": "product_id",
+              "aggregation": "count",
+              "alias": "item_count"
+            }
+          ],
+          "latency_ms": 1038.6644230002275,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计销量最高的前10个商品",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.total_price",
+              "aggregation": "sum",
+              "alias": "total_sales"
+            }
+          ],
+          "latency_ms": 1525.6905050009664,
+          "token_count": 25,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计商品销售总量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "oi.quantity",
+              "aggregation": "sum",
+              "alias": "total_sales_quantity"
+            }
+          ],
+          "latency_ms": 830.0827790008043,
+          "token_count": 7,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计不同商品的平均单价",
+          "expected_table": "order_items",
+          "selected_table": "",
+          "dimensions": [],
+          "metrics": [],
+          "latency_ms": 591.7724089995318,
+          "token_count": 4,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计每个订单的商品明细数量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "order_id",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 771.0472769995249,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计各商品的订单数",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.product_id",
+              "aggregation": "count",
+              "alias": "order_count"
+            }
+          ],
+          "latency_ms": 1130.494360000739,
+          "token_count": 18,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计每个商品的销售排名",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 1985.332460999416,
+          "token_count": 23,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计销量前100个商品的汇总",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.total_price",
+              "aggregation": "sum",
+              "alias": "total_sales"
+            }
+          ],
+          "latency_ms": 1589.8525120010163,
+          "token_count": 25,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计客户总数",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "customer_id",
+              "aggregation": "count",
+              "alias": "customer_count"
+            }
+          ],
+          "latency_ms": 1460.4508810007246,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按创建时间每天新增客户数",
+          "expected_table": "customers",
+          "selected_table": "",
+          "dimensions": [],
+          "metrics": [],
+          "latency_ms": 467.501839999386,
+          "token_count": 4,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计最近一年新增客户数",
+          "expected_table": "customers",
+          "selected_table": "sales_summary",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "s.new_customers",
+              "aggregation": "sum",
+              "alias": "total_new_customers"
+            }
+          ],
+          "latency_ms": 1457.6640800005407,
+          "token_count": 23,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按客户ID统计客户数量（去重）",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "COUNT(DISTINCT customer_id)"
+          ],
+          "metrics": [],
+          "latency_ms": 949.4052239988378,
+          "token_count": 7,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计每个月新增客户数",
+          "expected_table": "customers",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "DATE_TRUNC('month'",
+            "order_date)",
+            "COUNT(DISTINCT customer_id)"
+          ],
+          "metrics": [],
+          "latency_ms": 1294.2675370013603,
+          "token_count": 18,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计客户邮箱数量",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "email",
+              "aggregation": "count",
+              "alias": "email_count"
+            }
+          ],
+          "latency_ms": 1193.3851869998762,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按创建日期统计客户数 Top10 天",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "registration_date"
+          ],
+          "metrics": [
+            {
+              "column": "customer_id",
+              "aggregation": "count",
+              "alias": "customer_count"
+            }
+          ],
+          "latency_ms": 2260.328333999496,
+          "token_count": 16,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "按客户ID分组统计",
+          "expected_table": "customers",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "customer_id",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 769.1542899992783,
+          "token_count": 10,
+          "correct": false,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计每个客户的订单数量（仅客户表）",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "customer_name"
+          ],
+          "metrics": [
+            {
+              "column": "so.customer_id",
+              "aggregation": "count",
+              "alias": "total_orders"
+            }
+          ],
+          "latency_ms": 1883.7399129988626,
+          "token_count": 20,
+          "correct": true,
+          "rag_citation_hit": false
+        },
+        {
+          "query": "统计客户信息表的记录数",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 657.4291970009654,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": false
+        }
+      ],
+      "cost_per_query": 2.6e-05
+    },
+    "r2_with_rag": {
+      "accuracy": 0.6,
+      "avg_latency_ms": 1546.39,
+      "avg_tokens": 14.9,
+      "citation_accuracy": 1.0,
+      "details": [
+        {
+          "query": "统计 sales_orders 表，按 order_date 分组，返回订单数",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "order_date",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 1110.5879659990023,
+          "token_count": 13,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计销售订单金额按天",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "order_date"
+          ],
+          "metrics": [
+            {
+              "column": "total_amount",
+              "aggregation": "sum",
+              "alias": "total_sales"
+            }
+          ],
+          "latency_ms": 1167.5534080004581,
+          "token_count": 13,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按客户统计订单数 Top10",
+          "expected_table": "sales_orders",
+          "selected_table": "customers",
+          "dimensions": [
+            "customer_name"
+          ],
+          "metrics": [
+            {
+              "column": "so.order_id",
+              "aggregation": "count",
+              "alias": "total_orders"
+            }
+          ],
+          "latency_ms": 1826.7498810000689,
+          "token_count": 25,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "最近30天每天订单金额",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "order_date"
+          ],
+          "metrics": [
+            {
+              "column": "total_amount",
+              "aggregation": "sum",
+              "alias": "total_revenue"
+            }
+          ],
+          "latency_ms": 1363.8386160000664,
+          "token_count": 21,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按订单状态统计数量",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "status",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 989.2259259995626,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计2024年订单数",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_summary",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "total_orders",
+              "aggregation": "sum",
+              "alias": "total_orders_count"
+            }
+          ],
+          "latency_ms": 2030.578621001041,
+          "token_count": 14,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计订单平均金额",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "total_amount",
+              "aggregation": "avg",
+              "alias": "avg_order_value"
+            }
+          ],
+          "latency_ms": 1106.5356159997464,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计每周订单数",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "DATE_TRUNC('week'",
+            "order_date)"
+          ],
+          "metrics": [
+            {
+              "column": "order_id",
+              "aggregation": "count",
+              "alias": "total_orders"
+            }
+          ],
+          "latency_ms": 1643.4462019988132,
+          "token_count": 17,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计不同客户的订单金额总计",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "customer_name"
+          ],
+          "metrics": [
+            {
+              "column": "so.total_amount",
+              "aggregation": "sum",
+              "alias": "total_order_value"
+            }
+          ],
+          "latency_ms": 1887.4030509996373,
+          "token_count": 19,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计订单金额最高的前10个客户",
+          "expected_table": "sales_orders",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "customer_name"
+          ],
+          "metrics": [
+            {
+              "column": "so.total_amount",
+              "aggregation": "sum",
+              "alias": "total_revenue"
+            }
+          ],
+          "latency_ms": 2728.8601879990892,
+          "token_count": 25,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计 order_items 表中每个 product_id 的销售数量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "product_id"
+          ],
+          "metrics": [
+            {
+              "column": "quantity",
+              "aggregation": "sum",
+              "alias": "total_quantity"
+            }
+          ],
+          "latency_ms": 904.2222890002449,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按 product_id 汇总销量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "product_id"
+          ],
+          "metrics": [
+            {
+              "column": "quantity",
+              "aggregation": "sum",
+              "alias": "total_quantity_sold"
+            }
+          ],
+          "latency_ms": 1175.9546070006763,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计每个订单的商品数量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "order_id"
+          ],
+          "metrics": [
+            {
+              "column": "quantity",
+              "aggregation": "sum",
+              "alias": "total_quantity"
+            }
+          ],
+          "latency_ms": 1158.1250950002868,
+          "token_count": 10,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计销量最高的前10个商品",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.total_price",
+              "aggregation": "sum",
+              "alias": "total_sales"
+            }
+          ],
+          "latency_ms": 1845.1701980011421,
+          "token_count": 25,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计商品销售总量",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.quantity",
+              "aggregation": "sum",
+              "alias": "total_quantity_sold"
+            }
+          ],
+          "latency_ms": 1721.9088940000802,
+          "token_count": 18,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计不同商品的平均单价",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.unit_price",
+              "aggregation": "avg",
+              "alias": "average_unit_price"
+            }
+          ],
+          "latency_ms": 1894.600857000114,
+          "token_count": 18,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计每个订单的商品明细数量",
+          "expected_table": "order_items",
+          "selected_table": "order_items",
+          "dimensions": [
+            "order_id"
+          ],
+          "metrics": [
+            {
+              "column": "quantity",
+              "aggregation": "sum",
+              "alias": "total_quantity"
+            }
+          ],
+          "latency_ms": 1614.157742000316,
+          "token_count": 13,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计各商品的订单数",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.order_id",
+              "aggregation": "count",
+              "alias": "order_count"
+            }
+          ],
+          "latency_ms": 5465.937974000553,
+          "token_count": 19,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计每个商品的销售排名",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.quantity",
+              "aggregation": "sum",
+              "alias": "total_quantity_sold"
+            }
+          ],
+          "latency_ms": 1793.1403239999781,
+          "token_count": 23,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计销量前100个商品的汇总",
+          "expected_table": "order_items",
+          "selected_table": "products",
+          "dimensions": [
+            "product_name"
+          ],
+          "metrics": [
+            {
+              "column": "oi.total_price",
+              "aggregation": "sum",
+              "alias": "total_sales"
+            }
+          ],
+          "latency_ms": 1875.6395620002877,
+          "token_count": 25,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计客户总数",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "COUNT(DISTINCT customer_id)"
+          ],
+          "metrics": [],
+          "latency_ms": 833.8128280011006,
+          "token_count": 7,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按创建时间每天新增客户数",
+          "expected_table": "customers",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "DATE(created_at)",
+            "COUNT(DISTINCT customer_id)"
+          ],
+          "metrics": [],
+          "latency_ms": 1377.0436190006876,
+          "token_count": 16,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计最近一年新增客户数",
+          "expected_table": "customers",
+          "selected_table": "sales_summary",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "s.new_customers",
+              "aggregation": "sum",
+              "alias": "total_new_customers"
+            }
+          ],
+          "latency_ms": 1218.9876259999437,
+          "token_count": 14,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按客户ID统计客户数量（去重）",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "COUNT(DISTINCT customer_id)"
+          ],
+          "metrics": [],
+          "latency_ms": 981.1066360016412,
+          "token_count": 7,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计每个月新增客户数",
+          "expected_table": "customers",
+          "selected_table": "sales_summary",
+          "dimensions": [
+            "DATE_TRUNC('month'",
+            "summary_date)",
+            "new_customers"
+          ],
+          "metrics": [],
+          "latency_ms": 1163.50108000006,
+          "token_count": 11,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计客户邮箱数量",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [],
+          "metrics": [
+            {
+              "column": "email",
+              "aggregation": "count",
+              "alias": "email_count"
+            }
+          ],
+          "latency_ms": 738.0592740009888,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按创建日期统计客户数 Top10 天",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "registration_date"
+          ],
+          "metrics": [
+            {
+              "column": "customer_id",
+              "aggregation": "count",
+              "alias": "customer_count"
+            }
+          ],
+          "latency_ms": 1240.3204890015331,
+          "token_count": 16,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "按客户ID分组统计",
+          "expected_table": "customers",
+          "selected_table": "sales_orders",
+          "dimensions": [
+            "customer_id",
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 1286.3249019992509,
+          "token_count": 10,
+          "correct": false,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计每个客户的订单数量（仅客户表）",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "customer_name"
+          ],
+          "metrics": [
+            {
+              "column": "so.customer_id",
+              "aggregation": "count",
+              "alias": "total_orders"
+            }
+          ],
+          "latency_ms": 1339.980013000968,
+          "token_count": 20,
+          "correct": true,
+          "rag_citation_hit": true
+        },
+        {
+          "query": "统计客户信息表的记录数",
+          "expected_table": "customers",
+          "selected_table": "customers",
+          "dimensions": [
+            "COUNT(*)"
+          ],
+          "metrics": [],
+          "latency_ms": 908.7860520012327,
+          "token_count": 6,
+          "correct": true,
+          "rag_citation_hit": true
+        }
+      ],
+      "cost_per_query": 3e-05
+    }
+  },
+  "comparison": {
+    "accuracy_delta": 0.0667,
+    "latency_delta_ms": 371.93,
+    "avg_tokens_delta": 2.13,
+    "citation_accuracy_delta": 1.0
+  }
+}

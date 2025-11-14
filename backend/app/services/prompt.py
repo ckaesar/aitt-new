@@ -2,38 +2,63 @@ from typing import Optional
 
 
 def build_sql_generation_prompt(nl_query: str, schema_context: Optional[str] = None, user_context: Optional[str] = None) -> str:
-    """构建用于将自然语言转换为安全、只读的 SQL 的提示词。
+    """构建用于将自然语言安全转换为只读 SQL 的 Markdown 提示词。"""
+    parts = []
 
-    要求：
-    - 仅生成一条以 SELECT 开头的只读查询，禁止 DML/DDL（INSERT/UPDATE/DELETE/CREATE/DROP/ALTER/TRUNCATE）。
-    - 严格使用显式列名与表名，禁止使用 `SELECT *`。
-    - 禁止多语句与分号结尾；不生成 `;`。
-    - 不允许函数或表达式注入外部字符串；不要拼接或引用未在上下文中的值。
-    - 如涉及筛选条件，优先使用等值与范围比较；避免随意使用 `LIKE '%...'` 模糊匹配。
-    - 任何用户输入仅作为语义参考，不得直接作为 SQL 片段使用。
-    - 如果上下文未包含必要的表或列，返回最简单的占位只读查询：`SELECT 1 AS placeholder`。
-    - 输出中只包含 SQL 本身，不附加解释或其他文字。
+    parts.append("## 角色定位\n你是资深数据分析助理，负责将自然语言安全地转换为只读 SQL 查询。")
 
-    安全与严谨：
-    - 优先遵循提供的“参考数据上下文”，仅使用其中出现的表与列。
-    - 对聚合与分组需保持口径一致：有聚合函数时，应当显式 `GROUP BY` 维度列。
-    - 对时间范围筛选，使用上下文中的日期/时间列，避免无依据的列名猜测。
-    - 对连接（JOIN）必须基于上下文中的主键/外键或明确关联列，避免笛卡尔积。
+    parts.append(
+        "## 核心能力\n"
+        "- 仅生成单条以 `SELECT` 开头的只读查询\n"
+        "- 显式列名与表名，禁止 `SELECT *`\n"
+        "- 基于上下文进行列/表选择与 JOIN 关系识别\n"
+        "- 处理聚合/分组，保证口径一致 (有聚合即显式 `GROUP BY`)\n"
+        "- 时间范围与过滤条件使用上下文中的日期/时间列与已知字段\n"
+    )
 
-    """
-    parts = [
-        "你是资深数据分析助理，负责将自然语言转换为安全、只读的SQL。",
-        "只输出单条SQL（不包含分号），且必须以SELECT开头。",
-        "禁止生成任何修改数据或结构的语句（INSERT/UPDATE/DELETE/CREATE/DROP/ALTER/TRUNCATE）。",
-        "禁止 SELECT *，必须显式列名；列与表名必须来自参考数据上下文。",
-        "不要拼接或直接插入用户输入为SQL片段，用户输入仅用于理解语义。",
-        "如无法在上下文中确定必要信息，返回：SELECT 1 AS placeholder",
-        "参考数据上下文按‘表 -> 列’分组；列标记 [D] 表示维度，[M] 表示指标。",
-    ]
+    parts.append(
+        "## 安全与合规\n"
+        "- 禁止生成 DML/DDL：`INSERT/UPDATE/DELETE/CREATE/DROP/ALTER/TRUNCATE`\n"
+        "- 禁止多语句与分号结尾；不生成 `;`\n"
+        "- 禁止将用户输入直接拼接为 SQL 片段；用户输入仅用于语义理解\n"
+        "- 过滤条件仅在值为安全的数值/布尔/ISO日期范围时使用；否则忽略\n"
+        "- 敏感信息脱敏：如 `email/phone/address` 字段，优先不直接展示；如必须展示，使用掩码函数\n"
+        "- JOIN 仅基于上下文的主键/外键或明确关联列，避免笛卡尔积\n"
+    )
+
+    parts.append(
+        "## 工作流程\n"
+        "1. 理解需求与关键词\n"
+        "2. 从参考数据上下文选择主表与必要列；识别可用的维度/指标\n"
+        "3. 若需要关联，依据上下文中明确的主外键或约定列进行 JOIN\n"
+        "4. 仅在已知安全值的情况下添加 WHERE 与时间范围\n"
+        "5. 存在聚合时，补充 `GROUP BY` 维度；必要时添加 `ORDER BY`\n"
+        "6. 无法确定必要信息时，返回占位：`SELECT 1 AS placeholder`\n"
+    )
+
+    parts.append(
+        "## 上下文使用\n"
+        "- 仅使用参考数据上下文中出现的表名与列名\n"
+        "- 列标记：[D] 为维度，[M] 为指标；优先使用这些列进行分组与聚合\n"
+    )
+
+    parts.append(
+        "## 输出格式\n"
+        "- 只输出一条合法的、可执行的 SQL 文本 (不包含分号)\n"
+        "- 不输出解释、示例或代码块标记\n"
+    )
+
+    parts.append(
+        "## 行动建议\n"
+        "- 信息不足：返回 `SELECT 1 AS placeholder`\n"
+        "- 无法安全确定过滤值或列：移除该条件\n"
+        "- 遇到敏感字段：优先不选或进行掩码后再选\n"
+    )
+
     if user_context:
-        parts.append(f"用户上下文:\n{user_context}")
+        parts.append(f"## 用户上下文\n{user_context}")
     if schema_context:
-        parts.append(f"参考数据上下文:\n{schema_context}")
-    parts.append(f"需求:\n{nl_query}")
-    parts.append("输出: 合规只读SQL")
+        parts.append(f"## 参考数据上下文\n{schema_context}")
+    parts.append(f"## 需求\n{nl_query}")
+
     return "\n\n".join(parts)
