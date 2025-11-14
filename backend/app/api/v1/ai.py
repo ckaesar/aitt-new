@@ -70,6 +70,8 @@ async def ai_query(
         context=payload.context,
         use_rag=payload.use_rag or False,
         rag_context=rag_context,
+        conversation_id=payload.conversation_id,
+        rag_chunks=rag_chunks,
     )
     # 记录历史（开发模式：若数据库不可用则忽略错误）
     try:

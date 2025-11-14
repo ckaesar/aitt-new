@@ -18,6 +18,7 @@ from pymysql.cursors import DictCursor
 from sqlalchemy.engine.url import make_url
 
 from app.core.config import settings
+from app.services.rag import RAGService
 
 
 def _open_mysql_conn():
@@ -319,6 +320,81 @@ class MetadataIndexer:
                 "last_sync_time": now_dt.isoformat(timespec="seconds"),
             }
             logger.info("元数据索引同步完成: {}", summary)
+            # 从元数据派生任务型文档并写入文档RAG集合，提升检索可用性
+            try:
+                docs = []
+                ds_by_id = {int(s["id"]): s for s in sources}
+                cols_by_table: Dict[int, List[Dict]] = {}
+                for c in columns:
+                    tid = int(c.get("table_id") or 0)
+                    cols_by_table.setdefault(tid, []).append(c)
+                table_names = {int(t["id"]): str(t.get("table_name") or "") for t in tables}
+                name_set = set(x for x in table_names.values() if x)
+                def _rel_guess(col_name: str) -> str | None:
+                    n = (col_name or "").lower()
+                    if n.endswith("_id"):
+                        base = n[:-3]
+                        cand1 = base
+                        cand2 = base + "s"
+                        if cand1 in name_set:
+                            return cand1
+                        if cand2 in name_set:
+                            return cand2
+                    return None
+                for t in tables:
+                    tid = int(t["id"])
+                    tname = str(t.get("table_name") or "")
+                    tdisp = str(t.get("display_name") or "")
+                    dsid = int(t.get("data_source_id") or 0)
+                    ds = ds_by_id.get(dsid)
+                    cols = cols_by_table.get(tid) or []
+                    dim_cols = [str(c.get("column_name")) for c in cols if bool(c.get("is_dimension"))]
+                    met_cols = [str(c.get("column_name")) for c in cols if bool(c.get("is_metric"))]
+                    common_keys = ["id","name","category","brand","price","email","phone","city","address","status"]
+                    pick = []
+                    for k in common_keys:
+                        for c in cols:
+                            cn = str(c.get("column_name") or "")
+                            if k in cn.lower() and cn not in pick:
+                                pick.append(cn)
+                    if not pick:
+                        for c in cols:
+                            if bool(c.get("is_dimension")):
+                                pick.append(str(c.get("column_name")))
+                                if len(pick) >= 6:
+                                    break
+                    rels = []
+                    for c in cols:
+                        g = _rel_guess(str(c.get("column_name") or ""))
+                        if g:
+                            rels.append((str(c.get("column_name") or ""), g))
+                    rel_desc = "; ".join([f"{cn} -> {tn}" for cn, tn in rels]) if rels else ""
+                    dss = str(ds.get("name") if ds else "")
+                    doc_text = (
+                        f"数据源 {dss} 的表 {tname}" + (f" ({tdisp})" if tdisp else "") +
+                        (f"：常用字段：{', '.join(pick)}" if pick else "") +
+                        (f"；维度：{', '.join(dim_cols)}" if dim_cols else "") +
+                        (f"；指标：{', '.join(met_cols)}" if met_cols else "") +
+                        (f"；关联：{rel_desc}" if rel_desc else "")
+                    ).strip()
+                    if doc_text:
+                        docs.append({"id": f"doc:table:{tid}", "text": doc_text, "source": "metadata-doc"})
+                for s in sources:
+                    sid = int(s["id"])
+                    doc_text = (
+                        f"数据源 {str(s.get('name') or '')}：类型 {str(s.get('type') or '')}，库 {str(s.get('database_name') or '')}。"
+                    ).strip()
+                    if doc_text:
+                        docs.append({"id": f"doc:source:{sid}", "text": doc_text, "source": "metadata-doc"})
+                if docs:
+                    try:
+                        rag = RAGService()
+                        rag.upsert_documents(docs)
+                        logger.info("同步派生任务文档写入: {}", len(docs))
+                    except Exception as e:
+                        logger.warning("写入任务文档失败: {}", e)
+            except Exception as e:
+                logger.warning("生成任务文档异常: {}", e)
             # 将最近一次同步摘要写入 MySQL 表，供接口/前端查询
             try:
                 with conn.cursor() as write_cur:

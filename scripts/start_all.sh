@@ -21,8 +21,8 @@ set -euo pipefail
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 PYTHON_BIN="${PYTHON_BIN:-}"
-# 默认使用 aitt-py311 环境（可通过导出 CONDA_ENV_NAME 覆盖）
-CONDA_ENV_NAME="${CONDA_ENV_NAME:-aitt-py311}"
+# 默认使用 py311 环境（可通过导出 CONDA_ENV_NAME 覆盖）
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-py311}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

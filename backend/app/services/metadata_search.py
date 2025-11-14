@@ -19,6 +19,45 @@ class MetadataSearch:
         self.available = False
         # 初始化时不强制导入，延迟到第一次使用，保证服务可启动
 
+    def _rewrite(self, text: str) -> str:
+        """规范化查询文本以提升元数据检索命中率：
+        - 合并常见同义词（中英混合领域词，如产品/商品/SKU/SPU等）
+        - 英文统一为小写，保留原中文
+        """
+        q = (text or "").strip()
+        if not q:
+            return q
+        try:
+            import re as _re
+            s = _re.sub(r"\s+", " ", q).strip()
+            synonyms = {
+                "订单": "order",
+                "交易": "order",
+                "客户": "customer",
+                "用户": "customer",
+                "gmv": "amount",
+                "金额": "amount",
+                "支付": "amount",
+                "产品": "product",
+                "商品": "product",
+                "单品": "product",
+                "sku": "sku",
+                "SPU": "spu",
+                "spu": "spu",
+                "品类": "category",
+                "品牌": "brand",
+                "详情": "detail",
+                "详细信息": "detail",
+                "明细": "detail",
+            }
+            for k, v in synonyms.items():
+                s = s.replace(k, v)
+            # 仅将英文部分降为小写
+            s = _re.sub(r"[A-Z]", lambda m: m.group(0).lower(), s)
+            return s
+        except Exception:
+            return q
+
     def _ensure_client(self):
         """惰性导入并初始化chroma客户端与集合。"""
         if self.collection is not None:
@@ -78,7 +117,8 @@ class MetadataSearch:
         if not self.available or self.collection is None:
             return []
         try:
-            res = self.collection.query(query_texts=[text], n_results=top_k)
+            rewritten = self._rewrite(text)
+            res = self.collection.query(query_texts=[rewritten or text], n_results=top_k)
             out: List[Dict[str, str]] = []
             docs_list = res.get("documents", [[]])[0]
             metas_list = res.get("metadatas", [[]])[0]

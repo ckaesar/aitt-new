@@ -162,16 +162,68 @@ class RAGService:
         except Exception:
             pass
 
+    def rewrite_query(self, text: str) -> str:
+        """查询改写：对输入查询进行规范化与同义词替换以提升检索命中率"""
+        q = (text or "").strip()
+        if not q:
+            return q
+        try:
+            import re as _re
+            s = q
+            s = _re.sub(r"\s+", " ", s)
+            s = s.strip()
+            s_lower = s.lower()
+            # 中英同义词与规范表达
+            synonyms = {
+                "订单": "order",
+                "交易": "order",
+                "gmv": "amount",
+                "金额": "amount",
+                "支付": "amount",
+                "客户": "customer",
+                "用户": "customer",
+                "最近7天": "近7天",
+                "最近七天": "近7天",
+                "past 7 days": "近7天",
+                "last 7 days": "近7天",
+                "最近一年": "近12个月",
+                "过去一年": "近12个月",
+                "last year": "近12个月",
+                "产品": "product",
+                "商品": "product",
+                "单品": "product",
+                "sku": "sku",
+                "SPU": "spu",
+                "spu": "spu",
+                "品类": "category",
+                "品牌": "brand",
+                "详情": "detail",
+                "详细信息": "detail",
+                "明细": "detail",
+            }
+            for k, v in synonyms.items():
+                s = s.replace(k, v)
+                s_lower = s_lower.replace(k, v)
+            # 统一英文大小写对向量检索更友好
+            # 保留原中文，英文降为小写
+            def _mk_lower_english(txt: str) -> str:
+                return _re.sub(r"[A-Z]", lambda m: m.group(0).lower(), txt)
+            s = _mk_lower_english(s)
+            return s
+        except Exception:
+            return q
+
     def query(self, text: str, top_k: int = 4) -> List[Dict[str, str]]:
         # 惰性尝试连接chromadb
         self._ensure_client()
+        rewritten = self.rewrite_query(text)
         if not CHROMA_AVAILABLE or self.collection is None:
             logger.warning("RAG 使用回退存储进行查询：chromadb不可用或集合为空")
             docs = self._fallback_load()
             if not docs:
                 return []
             # 改进评分：中文/英文关键词包含 + 字符重叠（更鲁棒）
-            q = (text or "").strip().lower()
+            q = (rewritten or text or "").strip().lower()
             try:
                 import re as _re
                 kws = [k.lower() for k in _re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fa5]{2,}", q)]
@@ -202,11 +254,38 @@ class RAGService:
             except Exception:
                 pass
             return out
-        logger.info("RAG query 入参: len(text)={}, top_k={}", len(text or ""), top_k)
-        res = self.collection.query(query_texts=[text], n_results=top_k)
+        logger.info("RAG query 入参: len(text)={}, len(rewritten)={}, top_k={}", len(text or ""), len(rewritten or ""), top_k)
+        # 初始向量检索
+        res = self.collection.query(query_texts=[rewritten or text], n_results=max(8, top_k))
         out = []
         for docs, metas in zip(res.get("documents", [[]])[0], res.get("metadatas", [[]])[0]):
             out.append({"text": docs, "source": metas.get("source", "unknown")})
+        # 混合检索：BM25（若可用）与关键词评分融合
+        try:
+            import math as _math
+            q = (rewritten or text or "").strip()
+            # 简单BM25替代：词频+长度归一，作为额外信号
+            def _score_kw(s: str) -> float:
+                try:
+                    import re as _re
+                    toks = _re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fa5]{2,}", q.lower())
+                except Exception:
+                    toks = [w for w in q.lower().split() if len(w) >= 2]
+                base = 0.0
+                ls = s.lower()
+                for t in toks:
+                    if t in ls:
+                        base += 1.0
+                return base / (1.0 + len(ls) / 400.0)
+            # 重排序：向量检索结果 + 关键词得分融合
+            rescored = [
+                {"text": d["text"], "source": d["source"], "_score": _score_kw(d["text"]) }
+                for d in out
+            ]
+            rescored.sort(key=lambda x: x.get("_score", 0.0), reverse=True)
+            out = rescored[:top_k]
+        except Exception:
+            out = out[:top_k]
         # 若chromadb查询为空，尝试回退存储进行检索（提升健壮性）
         if not out:
             try:
@@ -216,7 +295,7 @@ class RAGService:
             # 复用改进回退评分逻辑
             docs_fb = self._fallback_load()
             if docs_fb:
-                q = (text or "").strip().lower()
+                q = (rewritten or text or "").strip().lower()
                 try:
                     import re as _re
                     kws = [k.lower() for k in _re.findall(r"[A-Za-z0-9_]+|[\u4e00-\u9fa5]{2,}", q)]
@@ -249,9 +328,9 @@ class RAGService:
         return out
 
     def get_context_for_query(self, text: str, top_k: int = 4) -> str:
-        chunks = self.query(text, top_k=top_k)
+        chunks = self.query(self.rewrite_query(text), top_k=top_k)
         # 关键字过滤：要求查询文本与片段存在关键词重叠，否则丢弃
-        q = (text or "").strip().lower()
+        q = (self.rewrite_query(text) or text or "").strip().lower()
         kws: List[str] = []
         try:
             import re as _re

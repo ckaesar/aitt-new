@@ -144,6 +144,29 @@ CREATE TABLE aitt_ai_conversations (
     INDEX idx_created_at (created_at)
 ) COMMENT 'AI对话记录表';
 
+-- 大模型调用日志表
+CREATE TABLE aitt_ai_call_logs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    conversation_id BIGINT NULL COMMENT '关联会话ID',
+    model_name VARCHAR(100) COMMENT '模型名称',
+    endpoint VARCHAR(100) COMMENT '调用端点',
+    prompt_tokens INT DEFAULT 0 COMMENT '提示词Token',
+    completion_tokens INT DEFAULT 0 COMMENT '生成Token',
+    total_tokens INT DEFAULT 0 COMMENT '总Token',
+    latency_ms INT DEFAULT 0 COMMENT '调用耗时毫秒',
+    use_rag BOOLEAN DEFAULT FALSE COMMENT '是否启用RAG',
+    rag_context_len INT DEFAULT 0 COMMENT 'RAG上下文长度',
+    metadata_context_len INT DEFAULT 0 COMMENT '元数据上下文长度',
+    rag_chunks JSON COMMENT '检索片段',
+    status ENUM('success','error','timeout') NOT NULL DEFAULT 'success' COMMENT '调用状态',
+    error_message TEXT COMMENT '错误信息',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    FOREIGN KEY (conversation_id) REFERENCES aitt_ai_conversations(id),
+    INDEX idx_model_name (model_name),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) COMMENT '大模型调用日志表';
+
 -- 查询模板表
 CREATE TABLE aitt_query_templates (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,

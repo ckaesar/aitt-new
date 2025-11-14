@@ -21,6 +21,8 @@ except Exception:
 class AIService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._max_retries = 2
+        self._timeout_seconds = 20
 
     async def create_conversation(self, user_id: int, title: Optional[str] = None, context: Optional[str] = None) -> AIConversation:
         conv = AIConversation(user_id=user_id, title=title or "新会话", context=context)
@@ -40,9 +42,10 @@ class AIService:
 
     def _rule_based_sql(self, nl_query: str) -> Optional[str]:
         """当未配置模型或调用失败时的规则兜底：
-        - 利用元数据结构化匹配，尝试识别订单表、日期列、金额/GMV列
-        - 生成近7天订单数量与GMV统计SQL（MySQL语法）
-        返回None表示无法可靠生成。
+        - 利用元数据结构化匹配识别意图：
+          1) 订单统计（近7天订单数与GMV）
+          2) 简单详情类查询（查看X的详细信息：主表+常用维度列）
+        - MySQL语法；若无法可靠生成返回None。
         """
         try:
             ms = MetadataSearch()
@@ -102,10 +105,12 @@ class AIService:
                     logger.warning("规则兜底MySQL元数据读取失败: {}", e2)
                     return None
             q = (nl_query or "").lower()
-            # 关键词集合
+            # 关键词集合（包含产品类词汇以支持详情意图）
             order_kw = ["order", "orders", "交易", "订单"]
             date_kw = ["date", "dt", "时间", "日期", "created_at", "order_date", "下单"]
             amt_kw = ["amount", "total_amount", "gmv", "price", "pay", "支付", "金额", "交易额"]
+            product_kw = ["product", "商品", "产品", "sku", "spu", "brand", "category"]
+            detail_kw = ["detail", "详细", "详情", "明细"]
 
             def pick_table() -> Optional[str]:
                 # 优先表名包含订单/交易关键词
@@ -135,26 +140,60 @@ class AIService:
                         return c.get("name")
                 return None
 
+            # 详情意图：当包含产品相关词汇或明确详情关键词时，优先返回主表的常见维度列
+            def is_detail_intent() -> bool:
+                return any(k in q for k in detail_kw) or any(k in q for k in product_kw)
+
+            if is_detail_intent():
+                # 从匹配中选择更像“产品”的表
+                candidates = list(matches.keys())
+                chosen = None
+                for t in candidates:
+                    tl = (t or "").lower()
+                    if any(k in tl for k in ["product", "sku", "spu"]):
+                        chosen = t
+                        break
+                if not chosen and candidates:
+                    chosen = candidates[0]
+                cols = matches.get(chosen, {}).get("columns") or []
+                # 选取常见维度列
+                want_kw = ["id", "name", "category", "brand", "price"]
+                sel = []
+                for w in want_kw:
+                    c = pick_col(cols, [w])
+                    if c and c not in sel:
+                        sel.append(c)
+                # 回退：如果仍然为空，取前5个维度列
+                if not sel:
+                    for c in cols:
+                        if c.get("is_dim"):
+                            sel.append(c.get("name"))
+                            if len(sel) >= 5:
+                                break
+                if chosen and sel:
+                    select_list = ", ".join([f"{x}" for x in sel])
+                    return f"SELECT {select_list} FROM {chosen}"
+                # 若详情意图无法确定列/表，继续尝试订单统计兜底
+
+            # 订单统计兜底
             tname = pick_table()
             if not tname:
                 return None
             cols = matches[tname].get("columns") or []
             date_col = pick_col(cols, date_kw) or "created_at"
             amt_col = pick_col(cols, amt_kw) or "amount"
-            # 是否包含近7天意图
             has_7d = any(k in q for k in ["近7天", "最近7天", "past 7", "last 7", "近七天"])
             date_cond = "DATE_SUB(CURDATE(), INTERVAL 7 DAY)" if has_7d else "DATE_SUB(CURDATE(), INTERVAL 30 DAY)"
-            sql = (
+            return (
                 f"SELECT COUNT(*) AS order_count, SUM({amt_col}) AS gmv\n"
                 f"FROM {tname}\n"
                 f"WHERE DATE({date_col}) >= {date_cond};"
             )
-            return sql
         except Exception as e:
             logger.warning("规则兜底生成失败: {}", e)
             return None
 
-    async def generate_sql(self, nl_query: str, context: Optional[str] = None, use_rag: bool = True, rag_context: Optional[str] = None) -> str:
+    async def generate_sql(self, nl_query: str, context: Optional[str] = None, use_rag: bool = True, rag_context: Optional[str] = None, conversation_id: Optional[int] = None, rag_chunks: Optional[list] = None) -> str:
         """生成SQL：支持RAG上下文与真实模型调用（带降级）。"""
         logger.info(
             f"AI生成SQL请求: len(query)={len(nl_query or '')}, use_rag={use_rag}, model={settings.AI_MODEL_NAME}, base_url={settings.OPENAI_BASE_URL}"
@@ -208,50 +247,162 @@ class AIService:
             logger.warning("AI SDK不可用或未配置API密钥，规则兜底失败，返回占位SQL")
             return "SELECT 1 AS placeholder;"
 
-        try:
-            client = OpenAI(base_url=settings.OPENAI_BASE_URL, api_key=settings.OPENAI_API_KEY)
-            # 使用 Chat Completions，要求仅输出SQL
-            completion = client.chat.completions.create(
-                model=settings.AI_MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": "你是资深数据分析助理，只输出合法SQL，不要解释，不要包含代码块标记。"},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
-                max_tokens=512,
-            )
-            content = completion.choices[0].message.content or ""
-            # 5) 规整输出：去除反引号代码块与前后噪音，只保留首段以 SELECT/WITH/INSERT/UPDATE/DELETE 开头的SQL
-            cleaned = content.strip()
-            # 去掉 ```sql/``` 包裹
-            cleaned = re.sub(r"^```sql\s*", "", cleaned, flags=re.IGNORECASE)
-            cleaned = re.sub(r"```\s*$", "", cleaned)
-            # 提取首个以常见SQL关键字开头的段落
-            m = re.search(r"\b(SELECT|WITH|INSERT|UPDATE|DELETE)\b[\s\S]*", cleaned, flags=re.IGNORECASE)
-            if m:
-                sql_text = m.group(0).strip()
-            else:
-                # 若模型未严格遵循，仅返回整段内容
-                sql_text = cleaned
-
-            # 简单兜底：若最终为空，返回占位SQL
-            if sql_text:
-                logger.info(f"AI生成SQL成功: {sql_text[:500]}")
-                return sql_text
-            else:
-                # 模型返回空内容时尝试规则兜底
+        # 带重试与超时的调用实现
+        client = OpenAI(base_url=settings.OPENAI_BASE_URL, api_key=settings.OPENAI_API_KEY)
+        attempt = 0
+        last_err: Exception | None = None
+        import time as _time
+        t0 = _time.perf_counter()
+        prompt_tokens = 0
+        completion_tokens = 0
+        model_name = settings.AI_MODEL_NAME
+        while attempt <= self._max_retries:
+            try:
+                # 使用 Chat Completions，要求仅输出SQL
+                completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": "你是资深数据分析助理，只输出合法SQL，不要解释，不要包含代码块标记。"},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.2,
+                    max_tokens=512,
+                    timeout=self._timeout_seconds,
+                )
+                # 统计tokens（SDK返回如有不一致则回退估算）
+                try:
+                    usage = getattr(completion, "usage", None)
+                    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+                    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+                except Exception:
+                    prompt_tokens = 0
+                    completion_tokens = 0
+                content = completion.choices[0].message.content or ""
+                cleaned = content.strip()
+                cleaned = re.sub(r"^```sql\s*", "", cleaned, flags=re.IGNORECASE)
+                cleaned = re.sub(r"```\s*$", "", cleaned)
+                m = re.search(r"\b(SELECT|WITH|INSERT|UPDATE|DELETE)\b[\s\S]*", cleaned, flags=re.IGNORECASE)
+                sql_text = m.group(0).strip() if m else cleaned
+                sql_text = sql_text or ""
+                latency_ms = int((_time.perf_counter() - t0) * 1000)
+                # 异步保存调用日志
+                try:
+                    import asyncio as _asyncio
+                    _asyncio.create_task(self._save_ai_call_log(
+                        conversation_id=conversation_id,
+                        model_name=model_name,
+                        endpoint="chat.completions",
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=prompt_tokens + completion_tokens,
+                        latency_ms=latency_ms,
+                        use_rag=bool(use_rag),
+                        rag_context_len=len(rag_context or ""),
+                        metadata_context_len=len((metadata_ctx or "")),
+                        rag_chunks=rag_chunks,
+                        status="success",
+                        error_message=None,
+                    ))
+                except Exception:
+                    pass
+                if sql_text:
+                    logger.info(f"AI生成SQL成功: {sql_text[:500]}")
+                    return sql_text
                 rb2 = self._rule_based_sql(nl_query)
                 if rb2:
                     logger.info("模型返回空，使用规则兜底SQL")
                     return rb2
                 logger.warning("AI返回空内容，降级为占位SQL")
                 return "SELECT 1 AS placeholder;"
+            except Exception as e:
+                last_err = e
+                attempt += 1
+                if attempt <= self._max_retries:
+                    # 指数退避重试
+                    import math
+                    _delay = min(2.0 ** attempt, 4.0)
+                    try:
+                        logger.warning("AI调用失败准备重试 attempt={} err={}", attempt, e)
+                    except Exception:
+                        pass
+                    await self._async_sleep(_delay)
+                else:
+                    break
+        # 全部失败：记录日志并降级
+        try:
+            import asyncio as _asyncio
+            latency_ms = int((_time.perf_counter() - t0) * 1000)
+            _asyncio.create_task(self._save_ai_call_log(
+                conversation_id=conversation_id,
+                model_name=model_name,
+                endpoint="chat.completions",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=prompt_tokens + completion_tokens,
+                latency_ms=latency_ms,
+                use_rag=bool(use_rag),
+                rag_context_len=len(rag_context or ""),
+                metadata_context_len=len((metadata_ctx or "")),
+                rag_chunks=rag_chunks,
+                status="error",
+                error_message=str(last_err) if last_err else None,
+            ))
+        except Exception:
+            pass
+        rb3 = self._rule_based_sql(nl_query)
+        if rb3:
+            logger.info("模型调用失败，使用规则兜底SQL")
+            return rb3
+        logger.warning(f"AI模型调用失败，降级为占位SQL: {last_err}")
+        return "SELECT 1 AS placeholder;"
+
+    async def _async_sleep(self, seconds: float):
+        """异步延时"""
+        import asyncio
+        await asyncio.sleep(max(0.0, float(seconds)))
+
+    async def _save_ai_call_log(
+        self,
+        conversation_id: Optional[int],
+        model_name: Optional[str],
+        endpoint: Optional[str],
+        prompt_tokens: int,
+        completion_tokens: int,
+        total_tokens: int,
+        latency_ms: int,
+        use_rag: bool,
+        rag_context_len: int,
+        metadata_context_len: int,
+        rag_chunks: Optional[list],
+        status: str,
+        error_message: Optional[str],
+    ):
+        """保存AI调用日志到数据库"""
+        try:
+            from app.models.ai_conversation import AICallLog
+            from app.models.query import QueryStatus
+            from app.core.database import AsyncSessionLocal
+            log = AICallLog(
+                conversation_id=conversation_id,
+                model_name=model_name or settings.AI_MODEL_NAME,
+                endpoint=endpoint or "chat.completions",
+                prompt_tokens=int(prompt_tokens or 0),
+                completion_tokens=int(completion_tokens or 0),
+                total_tokens=int(total_tokens or 0),
+                latency_ms=int(latency_ms or 0),
+                use_rag=bool(use_rag),
+                rag_context_len=int(rag_context_len or 0),
+                metadata_context_len=int(metadata_context_len or 0),
+                rag_chunks=rag_chunks,
+                status=QueryStatus.SUCCESS if status == "success" else QueryStatus.ERROR,
+                error_message=error_message,
+            )
+            async with AsyncSessionLocal() as s:
+                s.add(log)
+                await s.flush()
+                await s.commit()
         except Exception as e:
-            # 调用失败兜底并记录原因
-            # 调用失败时尝试规则兜底
-            rb3 = self._rule_based_sql(nl_query)
-            if rb3:
-                logger.info("模型调用失败，使用规则兜底SQL")
-                return rb3
-            logger.warning(f"AI模型调用失败，降级为占位SQL: {e}")
-            return "SELECT 1 AS placeholder;"
+            try:
+                logger.warning("保存AI调用日志失败: {}", e)
+            except Exception:
+                pass
