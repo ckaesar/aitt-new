@@ -187,7 +187,7 @@ class AIService:
             return (
                 f"SELECT COUNT(*) AS order_count, SUM({amt_col}) AS gmv\n"
                 f"FROM {tname}\n"
-                f"WHERE DATE({date_col}) >= {date_cond};"
+                f"WHERE DATE({date_col}) >= {date_cond}"
             )
         except Exception as e:
             logger.warning("规则兜底生成失败: {}", e)
@@ -259,14 +259,22 @@ class AIService:
         while attempt <= self._max_retries:
             try:
                 # 使用 Chat Completions，要求仅输出SQL
+                _approx_len = max(1, len(prompt or ""))
+                _dyn_max_tokens = max(128, min(512, int(_approx_len / 8)))
                 completion = client.chat.completions.create(
                     model=model_name,
                     messages=[
-                        {"role": "system", "content": "你是资深数据分析助理，只输出合法SQL，不要解释，不要包含代码块标记。"},
+                        {"role": "system", "content": "你是资深数据分析助理，只输出合法SQL，不要解释，不要包含代码块标记，不要包含分号。"},
                         {"role": "user", "content": prompt},
                     ],
-                    temperature=0.2,
-                    max_tokens=512,
+                    temperature=0.0,
+                    top_p=0.2,
+                    presence_penalty=0,
+                    frequency_penalty=0,
+                    max_tokens=_dyn_max_tokens,
+                    n=1,
+                    stop=[";", "\n```", "\n\n```", "\n--"],
+                    user=str(conversation_id or "anonymous"),
                     timeout=self._timeout_seconds,
                 )
                 # 统计tokens（SDK返回如有不一致则回退估算）
@@ -284,6 +292,7 @@ class AIService:
                 m = re.search(r"\b(SELECT|WITH|INSERT|UPDATE|DELETE)\b[\s\S]*", cleaned, flags=re.IGNORECASE)
                 sql_text = m.group(0).strip() if m else cleaned
                 sql_text = sql_text or ""
+                sql_text = re.sub(r";\s*$", "", sql_text)
                 latency_ms = int((_time.perf_counter() - t0) * 1000)
                 # 异步保存调用日志
                 try:
