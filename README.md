@@ -2,6 +2,8 @@
 
 面向业务分析与数据取数的智能平台，支持自然语言生成只读 SQL、RAG 增强检索、动态元数据同步与文档化，以及可视化查询与分享能力。
 
+ai_usage.md  https://beike.feishu.cn/wiki/RZbJwFw7VijCg2kIzIDcU8vfnCc
+
 ## 项目介绍
 - 自然语言到 SQL：通过提示工程与安全策略，仅生成单条只读 `SELECT`，不含分号与 DML/DDL。
 - RAG 检索增强：利用 ChromaDB 存储向量化元数据与派生文档，提升表/列选择与语义理解准确性。
